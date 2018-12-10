@@ -1,6 +1,8 @@
 package com.karamanolev;
 
+import com.karamanolev.geojsontiles.GeoJsonTiles;
 import com.karamanolev.openscad.BuildingsExporter;
+import com.karamanolev.osmbuildings.Feature;
 import com.karamanolev.osmbuildings.Tile;
 import com.karamanolev.osmbuildings.TileManager;
 
@@ -65,7 +67,12 @@ public class Main {
 //                tileManager.getTile(new TileCoords(18508, 12079, 15)) // Yavorov / Borisova
         };
 
-        BuildingsExporter exporter = new BuildingsExporter(elevationData, tileManager.getTiles(tileCoords));
+        GeoJsonTiles geoJsonTiles = new GeoJsonTiles(
+                "/Users/ivailo/repos/buildings-exporter/tiles-project/tile-polygons.geojson");
+        LatLng[] buildingsArea = geoJsonTiles.getPolygon(1);
+
+        BuildingsExporter exporter = new BuildingsExporter(tileManager, elevationData, buildingsArea);
+//        BuildingsExporter exporter = new BuildingsExporter(elevationData, buildingsArea, buildingsAreaFeatures);
         Utils.setClipboard(exporter.export());
 //        System.out.println(scadCode);
         System.out.println("Copied to clipboard!");

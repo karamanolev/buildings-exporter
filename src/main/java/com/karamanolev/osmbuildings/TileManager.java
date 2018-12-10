@@ -10,6 +10,7 @@ import org.json.JSONObject;
 
 import java.io.IOException;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 
@@ -30,7 +31,7 @@ public class TileManager {
         if (data.length == 0) {
             return new Tile(tileCoords);
         } else {
-            JSONObject jsonData = new JSONObject(new String(data, Charset.forName("UTF-8")));
+            JSONObject jsonData = new JSONObject(new String(data, StandardCharsets.UTF_8));
             return new Tile(tileCoords, jsonData);
         }
     }

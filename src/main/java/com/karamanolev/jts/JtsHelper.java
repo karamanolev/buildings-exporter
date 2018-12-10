@@ -5,7 +5,12 @@ import com.karamanolev.MercatorSquare;
 import com.karamanolev.XY;
 import org.locationtech.jts.geom.*;
 
+import java.util.ArrayList;
+
 public class JtsHelper {
+    public static GeometryFactory FACTORY = new GeometryFactory();
+    public static JtsHelper INSTANCE = new JtsHelper(FACTORY);
+
     private GeometryFactory factory;
 
     public JtsHelper(GeometryFactory factory) {
@@ -51,5 +56,24 @@ public class JtsHelper {
             holes[i] = quantizeLineString(polygon.getInteriorRingN(i));
         }
         return this.factory.createPolygon(exteriorRing, holes);
+    }
+
+
+    public XY[] toXY(double maxY, LineString ring) {
+        ArrayList<XY> xys = new ArrayList<>();
+        for (int i = 0; i < ring.getNumPoints(); i++) {
+            Coordinate coord = ring.getPointN(i).getCoordinate();
+            xys.add(new XY(coord.getX(), maxY - coord.getY()));
+        }
+        return xys.toArray(new XY[0]);
+    }
+
+    public XY[][] toXY(double maxY, Polygon polygon) {
+        ArrayList<XY[]> contours = new ArrayList<>();
+        contours.add(toXY(maxY, polygon.getExteriorRing()));
+        for (int ring = 0; ring < polygon.getNumInteriorRing(); ring++) {
+            contours.add(toXY(maxY, polygon.getInteriorRingN(ring)));
+        }
+        return contours.toArray(new XY[0][]);
     }
 }

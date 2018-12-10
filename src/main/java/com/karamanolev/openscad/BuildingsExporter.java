@@ -3,15 +3,19 @@ package com.karamanolev.openscad;
 
 import com.karamanolev.*;
 import com.karamanolev.jts.JtsHelper;
+import com.karamanolev.openscad.exporter.ScadLinearExtrude;
+import com.karamanolev.openscad.exporter.ScadPolygon;
+import com.karamanolev.openscad.exporter.ScadRoot;
 import com.karamanolev.osmbuildings.Feature;
 import com.karamanolev.osmbuildings.Tile;
-import org.locationtech.jts.geom.Coordinate;
-import org.locationtech.jts.geom.GeometryFactory;
-import org.locationtech.jts.geom.LineString;
+import com.karamanolev.osmbuildings.TileManager;
+import org.locationtech.jts.geom.Envelope;
+import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.Polygon;
 import org.locationtech.jts.operation.buffer.BufferOp;
 import org.locationtech.jts.operation.buffer.BufferParameters;
 
+import java.io.IOException;
 import java.util.ArrayList;
 
 public class BuildingsExporter {
@@ -26,36 +30,63 @@ public class BuildingsExporter {
         }
     }
 
-    private static double TERRAIN_BLOCK_SIZE = 200;
+    private static double SCALE = 1.0 / 5000;
+    private static double BASE_HEIGHT = 1;
 
-    private GeometryFactory factory = new GeometryFactory();
-    private JtsHelper geom = new JtsHelper(factory);
+    private TileManager tileManager;
     private GeoElevationData elevationData;
-    private Tile[] tiles;
+    private LatLng[] area;
+    private Polygon areaPolygon;
     private FeatureItem[] items;
 
-    public BuildingsExporter(GeoElevationData elevationData, Tile[] tiles) {
+    public BuildingsExporter(TileManager tileManager, GeoElevationData elevationData, LatLng[] area) {
+        this.tileManager = tileManager;
         this.elevationData = elevationData;
-        this.tiles = tiles;
+        this.area = area;
     }
 
-    private void collectFeatures() {
-        LatLng northWest = TileUtils.getBoundingBox(tiles[0].getCoords()).getNorthWest();
-        LatLng southEast = TileUtils.getBoundingBox(tiles[tiles.length - 1].getCoords()).getSouthEast();
-        MercatorSquare square = new MercatorSquare(new BoundingBox(northWest, southEast), TERRAIN_BLOCK_SIZE);
+    private void collectFeatures() throws IOException {
+        BoundingBox boundingBox = new BoundingBox(this.area);
+        TileCoords nwTile = TileUtils.getTileCoords(boundingBox.getNorthWest(), 15);
+        TileCoords seTile = TileUtils.getTileCoords(boundingBox.getSouthEast(), 15);
+        // Scale is meters:meters, OpenScad units are assumed mm
+        MercatorSquare square = new MercatorSquare(boundingBox, SCALE * 1000);
 
+        areaPolygon = JtsHelper.INSTANCE.toPolygon(square, new LatLng[][]{area});
+
+        int totalFeatures = 0;
         ArrayList<FeatureItem> features = new ArrayList<>();
-        for (Tile tile : tiles) {
-            for (Feature feature : tile.getFeatures()) {
-                FeatureItem featureItem = new FeatureItem(feature, geom.toPolygon(square, feature.getContours()));
+        for (int tileX = nwTile.getX(); tileX <= seTile.getX(); tileX++) {
+            for (int tileY = nwTile.getY(); tileY <= seTile.getY(); tileY++) {
+                Tile tile = this.tileManager.getTile(new TileCoords(tileX, tileY, nwTile.getZ()));
+
+                for (Feature feature : tile.getFeatures()) {
+                    Polygon polygon = JtsHelper.INSTANCE.toPolygon(square, feature.getContours());
+
+                    Geometry intersection = areaPolygon.intersection(polygon);
+                    if (!intersection.isEmpty()) {
+                        // If the intersection is the entire input polygon, it's entirely contained
+                        if (intersection.equalsNorm(polygon)) {
+                            FeatureItem featureItem = new FeatureItem(
+                                    feature, polygon);
+
 //                if (!feature.getId().equals("299355116") && !feature.getId().equals("299355123") && !feature.getId().equals("303540640")) {
-                if (!feature.getId().equals("297430606") && !feature.getId().equals("297430603")) {
+                            if (!feature.getId().equals("297430606") && !feature.getId().equals("297430603")) {
 //                    continue;
+                            }
+                            features.add(featureItem);
+                        } else {
+                            throw new RuntimeException("Partial intersection!");
+                        }
+                    }
+
+                    totalFeatures++;
                 }
-                features.add(featureItem);
             }
         }
         this.items = features.toArray(new FeatureItem[0]);
+
+        System.out.println(String.format("Collected %d / %d features", this.items.length, totalFeatures));
     }
 
     private Polygon bufferProcess(Polygon polygon) {
@@ -63,7 +94,7 @@ public class BuildingsExporter {
                 1,
                 BufferParameters.CAP_SQUARE
         ));
-        buffered = this.geom.quantizePolygon(buffered);
+        buffered = JtsHelper.INSTANCE.quantizePolygon(buffered);
 
 //        TopologyPreservingSimplifier simplifier = new TopologyPreservingSimplifier(buffered);
 //        simplifier.setDistanceTolerance(0.05);
@@ -74,33 +105,8 @@ public class BuildingsExporter {
 
     private void quantizePolygons() {
         for (FeatureItem item : this.items) {
-            item.polygon = this.geom.quantizePolygon(item.polygon);
+            item.polygon = JtsHelper.INSTANCE.quantizePolygon(item.polygon);
         }
-    }
-
-    private void pruneExternalPolygons() {
-        Polygon basePolygon = this.factory.createPolygon(new Coordinate[]{
-                new Coordinate(0, 0),
-                new Coordinate(TERRAIN_BLOCK_SIZE, 0),
-                new Coordinate(TERRAIN_BLOCK_SIZE, TERRAIN_BLOCK_SIZE),
-                new Coordinate(0, TERRAIN_BLOCK_SIZE),
-                new Coordinate(0, 0),
-        });
-
-        int pruned = 0;
-        for (FeatureItem item : this.items) {
-            if (item.feature.getId().equals("158759064")) {
-                pruned++;
-            }
-            double intersectionArea = item.polygon.intersection(basePolygon).getArea();
-            if (intersectionArea < 3) {
-                System.out.println("Pruning " + item.feature.getId() +
-                        String.format(" for small area: %.5f", intersectionArea));
-                item.polygon = null;
-                pruned++;
-            }
-        }
-        System.out.println("Pruned " + pruned + " features");
     }
 
     private void fixItems() {
@@ -108,11 +114,9 @@ public class BuildingsExporter {
         while (true) {
             for (int i = 0; i < items.length; i++) {
                 Polygon first = items[i].polygon;
-                if (first == null) continue;
 
                 for (int j = i + 1; j < items.length; j++) {
                     Polygon second = items[j].polygon;
-                    if (second == null) continue;
 
                     boolean intersects = first.intersects(second);
                     boolean needsBuffer = !intersects && first.isWithinDistance(second, 0.05);
@@ -135,33 +139,23 @@ public class BuildingsExporter {
         }
     }
 
-    private ArrayList<XY> toXY(LineString ring) {
-        ArrayList<XY> xys = new ArrayList<>();
-        for (int i = 0; i < ring.getNumPoints(); i++) {
-            Coordinate coord = ring.getPointN(i).getCoordinate();
-            xys.add(new XY(coord.getX(), TERRAIN_BLOCK_SIZE - coord.getY()));
-        }
-        return xys;
-    }
-
-    public String export() {
+    public String export() throws IOException {
         this.collectFeatures();
         this.quantizePolygons();
-        this.pruneExternalPolygons();
 
         System.out.println("Start fix features");
         long start = System.currentTimeMillis();
         this.fixItems();
         System.out.println("Fix features: " + (System.currentTimeMillis() - start));
 
-        StringBuilder builder = new StringBuilder();
+        Envelope envelope = this.areaPolygon.getEnvelopeInternal();
+        ScadRoot scadRoot = new ScadRoot();
 
         int maxFeatures = 100;
         for (FeatureItem featureItem : items) {
             Polygon polygon = featureItem.polygon;
             Feature feature = featureItem.feature;
 
-            if (polygon == null) continue;
 //            if (maxFeatures-- <= 0) break;
 
             if (
@@ -172,24 +166,20 @@ public class BuildingsExporter {
 //                continue;
             }
 
-            ArrayList<ArrayList<XY>> contours = new ArrayList<>();
-            contours.add(toXY(featureItem.polygon.getExteriorRing()));
-            for (int ring = 0; ring < featureItem.polygon.getNumInteriorRing(); ring++) {
-                contours.add(toXY(featureItem.polygon.getInteriorRingN(ring)));
-            }
-
             double height = featureItem.feature.getComputedHeight();
 //                LatLng buildingLocation = feature.getContours()[0][0];
 //                height += elevationData.getElevation(buildingLocation.getLat(), buildingLocation.getLng());
 
-            builder.append(String.format(
-                    "linear_extrude(height=%f) %s; // id: %s\n",
-                    height,
-                    OpenScadUtils.exportPolygon(contours),
-                    feature.getId()
-            ));
+            ScadPolygon scadPolygon = new ScadPolygon(JtsHelper.INSTANCE.toXY(envelope.getMaxY(), polygon));
+            ScadLinearExtrude extruded = new ScadLinearExtrude(BASE_HEIGHT + height, scadPolygon);
+            extruded.setComment("id: " + feature.getId());
+            scadRoot.addChild(extruded);
         }
 
-        return builder.toString();
+        XY[][] areaContours = JtsHelper.INSTANCE.toXY(envelope.getMaxY(), this.areaPolygon);
+
+        scadRoot.addChild(new ScadLinearExtrude(BASE_HEIGHT, new ScadPolygon(areaContours)));
+
+        return scadRoot.toString();
     }
 }

@@ -37,4 +37,9 @@ public class TileCoords {
         TileCoords other = (TileCoords) obj;
         return this.x == other.x && this.y == other.y && this.z == other.z;
     }
+
+    @Override
+    public String toString() {
+        return String.format("TileCoords(%d, %d, %d)", this.x, this.y, this.z);
+    }
 }

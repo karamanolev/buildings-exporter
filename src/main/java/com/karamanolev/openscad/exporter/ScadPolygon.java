@@ -23,6 +23,10 @@ public class ScadPolygon extends ScadNode {
             paths.add(contourPaths);
         }
 
-        this.params = new Object[]{points, paths};
+        if (paths.size() == 1) {
+            this.params = new IScadValue[]{points};
+        } else {
+            this.params = new IScadValue[]{points, paths};
+        }
     }
 }

@@ -11,6 +11,13 @@ public class ScadRoot extends ScadNode {
     @Override
     public String toString() {
         StringBuilder builder = new StringBuilder();
+
+        if (this.comment != null) {
+            builder.append("/*\n");
+            builder.append(this.comment);
+            builder.append("\n*/\n\n");
+        }
+
         for (ScadNode node : this.children) {
             builder.append(node);
             builder.append(";\n");

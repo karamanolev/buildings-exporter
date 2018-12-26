@@ -4,12 +4,15 @@ import com.karamanolev.LatLng;
 import com.karamanolev.MercatorSquare;
 import com.karamanolev.XY;
 import org.locationtech.jts.geom.*;
+import org.locationtech.jts.operation.buffer.BufferOp;
+import org.locationtech.jts.operation.buffer.BufferParameters;
 
+import java.awt.geom.Path2D;
 import java.util.ArrayList;
 
 public class JtsHelper {
-    public static GeometryFactory FACTORY = new GeometryFactory();
-    public static JtsHelper INSTANCE = new JtsHelper(FACTORY);
+    public static final GeometryFactory FACTORY = new GeometryFactory();
+    public static final JtsHelper INSTANCE = new JtsHelper(FACTORY);
 
     private GeometryFactory factory;
 
@@ -75,5 +78,25 @@ public class JtsHelper {
             contours.add(toXY(maxY, polygon.getInteriorRingN(ring)));
         }
         return contours.toArray(new XY[0][]);
+    }
+
+    public Path2D toPath2D(LineString lineString) {
+        Path2D path = new Path2D.Double();
+        Coordinate coords = lineString.getPointN(0).getCoordinate();
+        path.moveTo(coords.getX(), coords.getY());
+
+        for (int i = 1, points = lineString.getNumPoints(); i < points; i++) {
+            Coordinate iCoords = lineString.getPointN(i).getCoordinate();
+            path.lineTo(iCoords.getX(), iCoords.getY());
+        }
+
+        return path;
+    }
+
+    public Polygon buffer(Polygon polygon, double distance) {
+        return (Polygon) BufferOp.bufferOp(polygon, distance, new BufferParameters(
+                1,
+                BufferParameters.CAP_SQUARE
+        ));
     }
 }

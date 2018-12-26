@@ -3,7 +3,7 @@ package com.karamanolev.openscad.exporter;
 import java.util.ArrayList;
 import java.util.Arrays;
 
-public class ScadVector extends ArrayList<IScadValue> {
+public class ScadVector extends ArrayList<IScadValue> implements IScadValue {
     public ScadVector() {
     }
 

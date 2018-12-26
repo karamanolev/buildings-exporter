@@ -1,15 +1,17 @@
 package com.karamanolev;
 
 import com.karamanolev.geojsontiles.GeoJsonTiles;
-import com.karamanolev.openscad.BuildingsExporter;
-import com.karamanolev.osmbuildings.Feature;
-import com.karamanolev.osmbuildings.Tile;
-import com.karamanolev.osmbuildings.TileManager;
+import com.karamanolev.osmb.OsmbTile;
+import com.karamanolev.osmb.OsmbTileManager;
+import com.karamanolev.osmtiles.OsmTileManager;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 
 public class Main {
     public static void interpolateImage(GeoElevationData elevationData, LatLng southEast, LatLng northWest) throws IOException {
@@ -57,24 +59,28 @@ public class Main {
 //        interpolateImage(elevationData, boundingBox.getSouthEast(), boundingBox.getNorthWest());
 //        System.exit(0);
 
-        TileManager tileManager = new TileManager();
+        OsmbTileManager buildingsTileManager = new OsmbTileManager();
 
-        Tile[] tiles = new Tile[]{
+        OsmbTile[] tiles = new OsmbTile[]{
 //                tileManager.getTile(new TileCoords(18507, 12078, 15)),
 //                tileManager.getTile(new TileCoords(18508, 12078, 15)),
 //                tileManager.getTile(new TileCoords(18507, 12079, 15)),
-                tileManager.getTile(new TileCoords(18499, 12084, 15)) // Boyana
+                buildingsTileManager.getTile(new TileCoords(18499, 12084, 15)) // Boyana
 //                tileManager.getTile(new TileCoords(18508, 12079, 15)) // Yavorov / Borisova
         };
 
+        Integer tileNumber = 1;
         GeoJsonTiles geoJsonTiles = new GeoJsonTiles(
                 "/Users/ivailo/repos/buildings-exporter/tiles-project/tile-polygons.geojson");
-        LatLng[] buildingsArea = geoJsonTiles.getPolygon(1);
+        LatLng[] buildingsArea = geoJsonTiles.getPolygon(tileNumber);
 
-        BuildingsExporter exporter = new BuildingsExporter(tileManager, elevationData, buildingsArea);
-//        BuildingsExporter exporter = new BuildingsExporter(elevationData, buildingsArea, buildingsAreaFeatures);
-        Utils.setClipboard(exporter.export());
-//        System.out.println(scadCode);
+        OsmTileManager osmTileManager = new OsmTileManager();
+
+        BuildingsExporter exporter = new BuildingsExporter(
+                osmTileManager, buildingsTileManager, elevationData, buildingsArea, "OsmbTile: " + tileNumber);
+        BuildingsExporter.Result result = exporter.export();
+        Files.write(Paths.get("/Users/ivailo/Downloads/tile1.svg"), result.getSvg().getBytes(StandardCharsets.UTF_8));
+        Utils.setClipboard(result.getOpenScad());
         System.out.println("Copied to clipboard!");
 
 //        Utils.setClipboard(

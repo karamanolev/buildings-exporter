@@ -4,7 +4,7 @@ import java.util.ArrayList;
 
 public class ScadNode {
     protected String type;
-    protected Object[] params;
+    protected IScadValue[] params;
     protected ArrayList<ScadNode> children;
     protected String comment;
 

@@ -1,5 +1,7 @@
 package com.karamanolev;
 
+import java.util.ArrayList;
+
 public class TileCoords {
     private int x, y, z;
 
@@ -41,5 +43,19 @@ public class TileCoords {
     @Override
     public String toString() {
         return String.format("TileCoords(%d, %d, %d)", this.x, this.y, this.z);
+    }
+
+    public static TileCoords[] getTileCoords(BoundingBox boundingBox, int zoomLevel) {
+        TileCoords nwTile = TileUtils.getTileCoords(boundingBox.getNorthWest(), zoomLevel);
+        TileCoords seTile = TileUtils.getTileCoords(boundingBox.getSouthEast(), zoomLevel);
+
+        ArrayList<TileCoords> coords = new ArrayList<>();
+        for (int tileX = nwTile.getX(); tileX <= seTile.getX(); tileX++) {
+            for (int tileY = nwTile.getY(); tileY <= seTile.getY(); tileY++) {
+                coords.add(new TileCoords(tileX, tileY, zoomLevel));
+            }
+        }
+
+        return coords.toArray(new TileCoords[0]);
     }
 }

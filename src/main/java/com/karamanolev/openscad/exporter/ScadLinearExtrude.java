@@ -10,7 +10,7 @@ public class ScadLinearExtrude extends ScadNode {
 
     public ScadLinearExtrude(double height, ScadNode... children) {
         this();
-        this.params = new Object[]{height};
+        this.params = new IScadValue[]{new ScadDouble(height)};
         this.children = new ArrayList<>(Arrays.asList(children));
     }
 }
